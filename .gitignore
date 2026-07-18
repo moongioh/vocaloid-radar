@@ -1,0 +1,44 @@
+# --- secrets / env ---
+.env
+.env.*
+!.env.example
+credentials.json
+*.pem
+id_rsa*
+*.key
+
+# --- internal working ledgers (NOT for the public repo; kept local only) ---
+# The public face of dev progress is the commit history + README/ARCHITECTURE.
+WORKLOG.md
+state.yaml
+
+# --- internal / input material ---
+suggest/
+scratch/
+*.local
+
+# --- local-only scrub gate (a blocking tool that lists what it hides = a leak) ---
+scripts/scrub-check.sh
+
+# --- python ---
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# --- node / build ---
+node_modules/
+dist/
+
+# --- db dumps ---
+*.sql.gz
+*.dump
+
+# --- os / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

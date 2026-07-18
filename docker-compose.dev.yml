@@ -1,0 +1,37 @@
+# LOCAL DEV ONLY — mirrors the llm_gateway platform (PG16 + pgvector, `vocaloid` DB)
+# so vocaloid_radar can be built and tested in isolation before the OCI platform is
+# live. This is NOT a deployment target: production PG is owned by llm_gateway 0001.
+# Port 5433 on the host avoids clashing with gw-postgres (5432).
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: vr-postgres-dev
+    environment:
+      POSTGRES_USER: vocaloid
+      POSTGRES_PASSWORD: vocaloid
+      POSTGRES_DB: vocaloid
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - vocaloid_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vocaloid -d vocaloid"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: vr-app-dev
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://vocaloid:vocaloid@db:5432/vocaloid
+    volumes:
+      - ./:/app
+    command: ["sleep", "infinity"]
+
+volumes:
+  vocaloid_pgdata:
