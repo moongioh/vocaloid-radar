@@ -210,17 +210,28 @@ def run_embed(
 
 
 def similar(conn, song_id: int, k: int = 10) -> "list[tuple[int, str, float]]":
-    """Top-k nearest songs by cosine distance (self excluded)."""
+    """Top-k nearest songs by cosine distance (self excluded).
+
+    The reference vector is fetched first and passed as a bound parameter on
+    purpose: joining it in makes the ORDER BY expression reference another
+    relation, and the HNSW index is then unusable (the planner falls back to a
+    full scan + sort). At the current corpus size a scan is genuinely cheaper
+    and the planner still picks it — the point is that the query stays
+    index-eligible as the corpus grows.
+    """
     with conn.cursor() as cur:
+        cur.execute("SELECT embedding FROM song_embeddings WHERE song_id = %s", (song_id,))
+        row = cur.fetchone()
+        if row is None:
+            return []
+        ref = row[0]
         cur.execute(
-            "SELECT e.song_id, s.title, (e.embedding <=> ref.embedding)::float8 AS dist "
-            "FROM song_embeddings e "
-            "JOIN songs s ON s.id = e.song_id, "
-            "     (SELECT embedding FROM song_embeddings WHERE song_id = %s) ref "
-            "WHERE e.song_id <> %s "
-            "ORDER BY e.embedding <=> ref.embedding "
-            "LIMIT %s",
-            (song_id, song_id, k),
+            "SELECT e.song_id, s.title, (e.embedding <=> %(ref)s)::float8 AS dist "
+            "FROM song_embeddings e JOIN songs s ON s.id = e.song_id "
+            "WHERE e.song_id <> %(self)s "
+            "ORDER BY e.embedding <=> %(ref)s "
+            "LIMIT %(k)s",
+            {"ref": ref, "self": song_id, "k": k},
         )
         return list(cur.fetchall())
 

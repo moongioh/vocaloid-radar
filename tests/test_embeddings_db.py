@@ -114,8 +114,12 @@ def test_upsert_select_stale_and_similar(conn):
         assert cur.fetchone()[0] == 3
 
     # similar: rock A's nearest fixture neighbour is rock B; ballad C farther
-    neighbours = similar(conn, -920001, k=10_000)
+    neighbours = similar(conn, -920001, k=10)
     band = [(sid, dist) for sid, _, dist in neighbours if LO <= sid <= HI]
     assert band and band[0][0] == -920002
     dist_by_id = dict(band)
     assert dist_by_id[-920002] < dist_by_id[-920003]
+
+
+def test_similar_unknown_song_returns_empty(conn):
+    assert similar(conn, -920999) == []
