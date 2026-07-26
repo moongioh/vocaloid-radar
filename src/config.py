@@ -18,3 +18,7 @@ DATABASE_URL = os.environ.get(
 # GATEWAY_API_KEY is the LiteLLM key; it lives in the environment, never in git.
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:4000")
 GATEWAY_API_KEY = os.environ.get("GATEWAY_API_KEY", "")
+
+# V3.2 embedding lane. gw-embed = voyage-4-large (1024d) on the gateway; the
+# schema's vector(1024) is tied to this — swapping models means re-embedding.
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "gw-embed")

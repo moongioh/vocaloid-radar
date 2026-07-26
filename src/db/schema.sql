@@ -113,13 +113,33 @@ CREATE TABLE IF NOT EXISTS weekly_reports (
     generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 10. song_embeddings — pgvector. dim is tied to the embedding model
---     (text-embedding-004 = 768) and finalized at V3.2. The HNSW index is
---     deferred until the model and data are locked.
+-- 10. song_embeddings — pgvector. dim FINALIZED at V3.2 (2026-07-26):
+--     gw-embed = voyage-4-large via the llm_gateway proxy → 1024. The earlier
+--     text-embedding-004 (768) candidate was dropped — the platform's live
+--     embedding lane is Voyage and reusing it adds no gateway config surface.
+--     (Existing deployments were empty at the switch; the table was dropped
+--     and recreated rather than migrated.)
 CREATE TABLE IF NOT EXISTS song_embeddings (
     song_id     BIGINT PRIMARY KEY REFERENCES songs (id) ON DELETE CASCADE,
-    embedding   vector(768),
+    embedding   vector(1024),
     source_text TEXT,
     model       TEXT,
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+--     Pre-V3.2 deployments already have the column at vector(768); CREATE TABLE
+--     IF NOT EXISTS cannot widen it, so upgrade in place. Safe by construction:
+--     if any row were populated at the old dim the cast raises and the migration
+--     stops loudly rather than dropping vectors silently.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        WHERE c.relname = 'song_embeddings' AND a.attname = 'embedding'
+          AND format_type(a.atttypid, a.atttypmod) <> 'vector(1024)'
+    ) THEN
+        ALTER TABLE song_embeddings ALTER COLUMN embedding TYPE vector(1024);
+    END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS song_embeddings_hnsw_idx
+    ON song_embeddings USING hnsw (embedding vector_cosine_ops);
