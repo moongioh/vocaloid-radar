@@ -12,6 +12,9 @@ id_rsa*
 WORKLOG.md
 state.yaml
 
+# --- generated dashboard data (the weekly batch regenerates these) ---
+dashboard/data/
+
 # --- internal / input material ---
 suggest/
 scratch/

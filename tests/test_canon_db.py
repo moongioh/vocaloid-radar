@@ -66,6 +66,11 @@ def test_db_roundtrip(conn):
     work_ids = {it.id for it in items if 900000 <= it.id <= 900010}
     assert work_ids == {900002, 900003, 900004}  # cache hit (900001) excluded
 
+    # Route ONLY the seeded rows: load_work sweeps in any real seeded tags too,
+    # and persisting scripted-caller results for those corrupts live data
+    # (it did — 2026-07-26, every real tag became canon 'ロック').
+    items = [it for it in items if 900000 <= it.id <= 900010]
+
     vocab = load_vocab(conn)
     assert "ロック" in vocab
 
