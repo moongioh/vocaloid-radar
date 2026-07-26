@@ -25,6 +25,13 @@ BATCH_SIZE = 64
 _ATTEMPTS = 3
 _BACKOFF_BASE = 2.0  # seconds; doubles per retry
 
+# HNSW search width. pgvector's default (40) measurably under-returns here: the
+# corpus is one narrow slice of Vocaloid releases, so neighbours sit in a tight
+# distance band (top-10 spanned 0.2302..0.2889 on the 2000-song backfill) and a
+# narrow search settles into a local minimum — it missed the exact #1, #2 and a
+# known cover. At 200 the index path matched the exact top-10 exactly.
+EF_SEARCH = 200
+
 
 class SourceRow(NamedTuple):
     song_id: int
@@ -209,17 +216,22 @@ def run_embed(
     return {"songs": len(rows), "stale": len(stale), "embedded": done}
 
 
-def similar(conn, song_id: int, k: int = 10) -> "list[tuple[int, str, float]]":
+def similar(
+    conn, song_id: int, k: int = 10, *, ef_search: int = EF_SEARCH
+) -> "list[tuple[int, str, float]]":
     """Top-k nearest songs by cosine distance (self excluded).
 
     The reference vector is fetched first and passed as a bound parameter on
     purpose: joining it in makes the ORDER BY expression reference another
     relation, and the HNSW index is then unusable (the planner falls back to a
-    full scan + sort). At the current corpus size a scan is genuinely cheaper
-    and the planner still picks it — the point is that the query stays
-    index-eligible as the corpus grows.
+    full scan + sort).
+
+    ``SET LOCAL`` needs a transaction, which is psycopg's default; on an
+    autocommit connection Postgres warns and the search falls back to the
+    default width rather than failing silently.
     """
     with conn.cursor() as cur:
+        cur.execute(f"SET LOCAL hnsw.ef_search = {int(ef_search)}")
         cur.execute("SELECT embedding FROM song_embeddings WHERE song_id = %s", (song_id,))
         row = cur.fetchone()
         if row is None:
