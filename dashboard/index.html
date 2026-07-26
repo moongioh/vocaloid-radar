@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vocaloid Radar</title>
+<style>
+  /* Self-contained --cn-* subset (canon v2, workspace assets/design-tokens-canon-v2.css).
+     This repo is public/standalone, so the values are self-declared like the showcase helmet. */
+  :root{
+    --cn-bg:#f5f8fc; --cn-card:#ffffff;
+    --cn-ink:#1c2a3d; --cn-muted:#5b6b80; --cn-faint:#8b99ac;
+    --cn-line:#e2e9f2; --cn-line-strong:#cbd7e4;
+    --cn-primary:#3B82F6; --cn-primary-deep:#2563EB; --cn-link:#2563EB;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --cn-bg:#0e1420; --cn-card:#161e2e;
+      --cn-ink:#e8edf6; --cn-muted:#98a8bf; --cn-faint:#67788f;
+      --cn-line:#243146; --cn-line-strong:#31415c;
+      --cn-primary:#6EA3F7; --cn-primary-deep:#8AB4F8; --cn-link:#8AB4F8;
+    }
+  }
+  *{box-sizing:border-box;margin:0}
+  body{
+    font-family:'Pretendard','Noto Sans KR',system-ui,sans-serif;
+    background:var(--cn-bg); color:var(--cn-ink);
+    min-height:100vh; display:grid; place-items:center; padding:24px;
+  }
+  .card{
+    background:var(--cn-card); border:1px solid var(--cn-line);
+    border-radius:16px; padding:32px; max-width:520px; width:100%;
+    box-shadow:0 1px 3px rgba(16,30,54,.08);
+  }
+  h1{font-size:24px; line-height:32px; margin-bottom:4px}
+  h1 .dot{color:var(--cn-primary)}
+  .tag{font-size:13px; color:var(--cn-faint); margin-bottom:24px}
+  p{font-size:15px; line-height:1.6; color:var(--cn-muted)}
+  p+p{margin-top:12px}
+  .status{
+    display:inline-block; margin-top:24px; padding:4px 12px;
+    font-size:13px; font-weight:500; border-radius:9999px;
+    color:var(--cn-primary-deep); border:1px solid var(--cn-line-strong);
+  }
+  a{color:var(--cn-link)}
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1>Vocaloid Radar<span class="dot">.</span></h1>
+    <div class="tag">leading-indicator trend radar for Vocaloid songs</div>
+    <p>Weekly LangGraph batch → trend scores → this page. The full dashboard (V4) is not built yet; the pipeline already publishes its report data as JSON.</p>
+    <p>Latest batch output: <a href="/data/">/data/</a></p>
+    <span class="status">collection phase — daily metrics accruing</span>
+  </main>
+</body>
+</html>
