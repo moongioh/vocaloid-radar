@@ -148,7 +148,7 @@ def make_embedder(
 
 _SOURCE_SQL = """
 SELECT s.id, s.title, s.song_type,
-       COALESCE((SELECT array_agg(a.name ORDER BY a.name)
+       COALESCE((SELECT array_agg(DISTINCT a.name ORDER BY a.name)
                  FROM song_artists sa JOIN artists a ON a.id = sa.artist_id
                  WHERE sa.song_id = s.id), '{}'),
        COALESCE((SELECT array_agg(DISTINCT CASE

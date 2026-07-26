@@ -52,10 +52,15 @@ def conn():
                 "INSERT INTO artists (id, name) VALUES (-920101, 'zP'), (-920102, 'aP') "
                 "ON CONFLICT (id) DO NOTHING"
             )
+            # zP appears twice under different roles — one artist, one name in the text
             cur.executemany(
-                "INSERT INTO song_artists (song_id, artist_id, role) VALUES (%s, %s, '') "
+                "INSERT INTO song_artists (song_id, artist_id, role) VALUES (%s, %s, %s) "
                 "ON CONFLICT DO NOTHING",
-                [(-920001, -920101), (-920001, -920102)],
+                [
+                    (-920001, -920101, "Composer"),
+                    (-920001, -920101, "Vocalist"),
+                    (-920001, -920102, ""),
+                ],
             )
             # one canon-confirmed tag (canon name must win) + one pending (raw name)
             cur.executemany(
