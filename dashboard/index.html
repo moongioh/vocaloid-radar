@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vocaloid Radar</title>
+<title>Vocaloid Radar — 주간 트렌드</title>
 <style>
   /* Self-contained --cn-* subset (canon v2, workspace assets/design-tokens-canon-v2.css).
      This repo is public/standalone, so the values are self-declared like the showcase helmet. */
@@ -21,37 +21,236 @@
       --cn-primary:#6EA3F7; --cn-primary-deep:#8AB4F8; --cn-link:#8AB4F8;
     }
   }
+
+  /* Spacing scale (DESIGN.md §11A) — only these steps are used below.
+     4 / 8 / 12 / 16 / 24 / 32 / 48. No ad-hoc px. */
+
   *{box-sizing:border-box;margin:0}
   body{
     font-family:'Pretendard','Noto Sans KR',system-ui,sans-serif;
     background:var(--cn-bg); color:var(--cn-ink);
-    min-height:100vh; display:grid; place-items:center; padding:24px;
+    line-height:1.6; padding:32px 24px 48px;
   }
-  .card{
-    background:var(--cn-card); border:1px solid var(--cn-line);
-    border-radius:16px; padding:32px; max-width:520px; width:100%;
-    box-shadow:0 1px 3px rgba(16,30,54,.08);
-  }
-  h1{font-size:24px; line-height:32px; margin-bottom:4px}
+  /* §3C fluid + cap: wide screens gain columns, they never stretch one element. */
+  .wrap{width:min(100%,1280px); margin-inline:auto;
+        display:flex; flex-direction:column; gap:32px}
+
+  /* numerals: tabular so columns of figures line up (§5). System mono stack keeps
+     the page self-contained — no external font request (§3E-5). */
+  .num{font-family:ui-monospace,'JetBrains Mono',SFMono-Regular,Menlo,monospace;
+       font-variant-numeric:tabular-nums}
+
+  /* ---------------------------------------------------------------- header */
+  header{display:flex; flex-wrap:wrap; align-items:baseline; gap:12px}
+  h1{font-size:26px; line-height:34px; letter-spacing:-.01em}
   h1 .dot{color:var(--cn-primary)}
-  .tag{font-size:13px; color:var(--cn-faint); margin-bottom:24px}
-  p{font-size:15px; line-height:1.6; color:var(--cn-muted)}
-  p+p{margin-top:12px}
-  .status{
-    display:inline-block; margin-top:24px; padding:4px 12px;
-    font-size:13px; font-weight:500; border-radius:9999px;
-    color:var(--cn-primary-deep); border:1px solid var(--cn-line-strong);
+  .week{font-size:15px; color:var(--cn-muted)}
+  .meta{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap}
+  .badge{
+    font-size:12px; padding:4px 12px; border-radius:9999px;
+    border:1px solid var(--cn-line-strong); color:var(--cn-muted);
+    white-space:nowrap;
   }
-  a{color:var(--cn-link)}
+
+  /* ------------------------------------------------------------ status strip */
+  .strip{
+    border:1px solid var(--cn-line-strong); border-left:3px solid var(--cn-primary);
+    border-radius:12px; background:var(--cn-card); padding:16px 20px;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .strip .label{
+    font-family:ui-monospace,'JetBrains Mono',SFMono-Regular,Menlo,monospace;
+    font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--cn-faint);
+  }
+  .strip .line{font-size:14px; color:var(--cn-muted)}
+  .strip .line strong{color:var(--cn-ink); font-weight:600}
+
+  /* ------------------------------------------------------------------- grid */
+  /* auto-fit: few cards fill the row, many cards add columns (§3C). */
+  .cols{display:grid; gap:24px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+
+  section.card{
+    background:var(--cn-card); border:1px solid var(--cn-line);
+    border-radius:16px; padding:24px;
+    box-shadow:0 1px 3px rgba(16,30,54,.08);
+    display:flex; flex-direction:column; gap:16px;   /* gap-first: children carry no margin (§11B) */
+  }
+  section.card > h2{
+    font-size:16px; line-height:24px; font-weight:600;
+    display:flex; align-items:baseline; gap:8px;
+  }
+  section.card > h2 .count{font-size:13px; color:var(--cn-faint); font-weight:400}
+
+  /* --------------------------------------------------------------- lists */
+  ul.rows{list-style:none; display:flex; flex-direction:column; gap:8px}
+  ul.rows li{
+    display:flex; align-items:baseline; gap:12px;
+    padding:8px 12px; border-radius:8px; border:1px solid var(--cn-line);
+    font-size:14px; transition:border-color .15s, box-shadow .15s;
+  }
+  ul.rows li:hover{border-color:var(--cn-line-strong); box-shadow:0 1px 3px rgba(16,30,54,.08)}
+  ul.rows .rank{font-size:12px; color:var(--cn-faint); min-width:20px}
+  ul.rows .title{flex:1; overflow-wrap:anywhere}
+  ul.rows .side{font-size:12px; color:var(--cn-muted)}
+  ul.rows a{color:var(--cn-link); text-decoration:none}
+  ul.rows a:hover{text-decoration:underline}
+
+  /* ------------------------------------------------------------ empty state */
+  /* A first-class state, not a blank box: says what is missing and why. */
+  .empty{
+    border:1px dashed var(--cn-line-strong); border-radius:12px;
+    padding:20px; display:flex; flex-direction:column; gap:4px;
+  }
+  .empty .head{font-size:14px; font-weight:600; color:var(--cn-muted)}
+  .empty .why{font-size:13px; color:var(--cn-faint)}
+
+  /* -------------------------------------------------------------- narrative */
+  /* Prose stays capped at a readable measure even as the container widens (§3C). */
+  .prose{max-width:760px; font-size:15px; display:flex; flex-direction:column; gap:12px}
+  .prose h3{font-size:17px; font-weight:600; color:var(--cn-ink)}
+  .prose p{color:var(--cn-muted)}
+  .prose strong{color:var(--cn-ink); font-weight:600}
+  .prose ul{padding-left:20px; color:var(--cn-muted); display:flex; flex-direction:column; gap:4px}
+
+  footer{font-size:13px; color:var(--cn-faint); display:flex; flex-direction:column; gap:4px}
+  footer a{color:var(--cn-link)}
+
+  /* ------------------------------------------------------------------ print */
+  /* §3E: force light, promote borders (no elevation on paper), avoid splits,
+     and pin the card grid to 2 columns so A4 does not explode into pages. */
+  @media print{
+    :root{color-scheme:light}
+    body{background:#fff; padding:0}
+    section.card{box-shadow:none; border-color:var(--cn-line-strong); break-inside:avoid}
+    ul.rows li{break-inside:avoid}
+    .strip{break-inside:avoid}
+    section.card > h2{break-after:avoid}
+    .cols{grid-template-columns:1fr 1fr}
+  }
 </style>
 </head>
 <body>
-  <main class="card">
+<div class="wrap" id="app">
+  <header>
     <h1>Vocaloid Radar<span class="dot">.</span></h1>
-    <div class="tag">leading-indicator trend radar for Vocaloid songs</div>
-    <p>Weekly LangGraph batch → trend scores → this page. The full dashboard (V4) is not built yet; the pipeline already publishes its report data as JSON.</p>
-    <p>Latest batch output: <a href="/data/">/data/</a></p>
-    <span class="status">collection phase — daily metrics accruing</span>
-  </main>
+    <span class="week" id="week">불러오는 중…</span>
+    <div class="meta" id="meta"></div>
+  </header>
+  <div id="body"></div>
+</div>
+
+<script>
+// The page is static; the weekly batch regenerates data/latest.json. Same-origin
+// fetch only — no external host is contacted (§3E-5).
+const $ = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content; };
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* Minimal markdown for the weekly narrative: headings, bold, bullets, paragraphs.
+   A full parser would be a dependency and an external request for one text block. */
+function md(src){
+  const blocks = String(src).split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+  return blocks.map(b => {
+    const bold = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const h = b.match(/^(#{1,6})\s+(.*)$/);
+    if (h) return `<h3>${bold(h[2])}</h3>`;
+    if (/^[-*]\s+/m.test(b) && b.split('\n').every(l => /^[-*]\s+/.test(l.trim())))
+      return `<ul>${b.split('\n').map(l => `<li>${bold(l.replace(/^[-*]\s+/, ''))}</li>`).join('')}</ul>`;
+    return `<p>${bold(b).replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+}
+
+const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? iso
+  : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} `
+  + `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+
+// Empty is the normal early state, so it explains itself instead of rendering a blank card.
+const empty = (head, why) =>
+  `<div class="empty"><div class="head">${esc(head)}</div><div class="why">${esc(why)}</div></div>`;
+
+function render(d){
+  const ev = d.evidence || {};
+  const watchlist = ev.watchlist || [], top = ev.top_songs || [],
+        deltas = ev.tag_deltas || [], clusters = ev.clusters || [];
+
+  document.getElementById('week').textContent = `${d.week} 주간`;
+  document.getElementById('meta').innerHTML =
+    `<span class="badge">생성 ${esc(fmt(d.generated_at))}</span>` +
+    `<span class="badge">서술 모델 ${esc(d.model || '—')}</span>`;
+
+  // The signal columns are derived from a time series, so they stay empty until
+  // enough weeks exist. Say that plainly rather than showing zeroes as a finding.
+  const warming = top.length === 0 && deltas.length === 0;
+  const strip = warming ? `
+    <div class="strip">
+      <div class="label">관측 단계</div>
+      <div class="line"><strong>급상승 신호는 아직 산출되지 않았습니다.</strong></div>
+      <div class="line">조회 velocity와 태그 점유율 변화는 <strong>주 경계 간 차이</strong>로 계산하므로,
+        완결된 주가 2주 이상 쌓여야 값이 나옵니다. 현재는 관찰 대상만 추리는 단계입니다.</div>
+    </div>` : '';
+
+  const songLink = (s) => s.song_id
+    ? `<a href="https://vocadb.net/S/${encodeURIComponent(s.song_id)}" target="_blank" rel="noopener">${esc(s.title)}</a>`
+    : esc(s.title);
+
+  const list = (items, side) => `<ul class="rows">${items.map((s, i) =>
+    `<li><span class="rank num">${i+1}</span><span class="title">${songLink(s)}</span>` +
+    (side ? `<span class="side num">${esc(side(s))}</span>` : '') + `</li>`).join('')}</ul>`;
+
+  const risingCard = `
+    <section class="card">
+      <h2>급상승 신호 <span class="count">${top.length ? `${top.length}곡` : '산출 전'}</span></h2>
+      ${top.length ? list(top, s => s.score != null ? Number(s.score).toFixed(2) : '')
+        : empty('확정된 신호 없음', '주 경계 간 속도 비교가 가능해지면 여기에 표시됩니다.')}
+    </section>`;
+
+  const watchCard = `
+    <section class="card">
+      <h2>관찰 대상 <span class="count">${watchlist.length}곡</span></h2>
+      ${watchlist.length ? list(watchlist)
+        : empty('관찰 대상 없음', '이번 주에 지표가 기록된 곡이 없습니다.')}
+    </section>`;
+
+  const tagCard = `
+    <section class="card">
+      <h2>태그 점유율 변화 <span class="count">${deltas.length ? `${deltas.length}건` : '산출 전'}</span></h2>
+      ${deltas.length ? `<ul class="rows">${deltas.map((t, i) =>
+          `<li><span class="rank num">${i+1}</span><span class="title">${esc(t.canon)}</span>` +
+          `<span class="side num">${t.delta_pp > 0 ? '+' : ''}${esc(t.delta_pp)}pp · 점유 ${esc(t.share_pct)}%</span></li>`
+        ).join('')}</ul>`
+        : empty('점유율 변화 없음', '태그 정규화가 진행 중이고, 비교할 이전 주가 아직 없습니다.')}
+    </section>`;
+
+  // Clusters get no card at all when absent — an empty box for a feature that has
+  // not produced anything yet is noise, not information.
+  const clusterCard = clusters.length ? `
+    <section class="card">
+      <h2>클러스터 <span class="count">${clusters.length}건</span></h2>
+      <ul class="rows">${clusters.map((c, i) =>
+        `<li><span class="rank num">${i+1}</span><span class="title">${esc(c.label || c.name || '(무명)')}</span>` +
+        `<span class="side num">${esc(c.size ?? '')}</span></li>`).join('')}</ul>
+    </section>` : '';
+
+  document.getElementById('body').innerHTML = `
+    ${strip}
+    <div class="cols">${risingCard}${watchCard}${tagCard}${clusterCard}</div>
+    <section class="card">
+      <h2>주간 서술</h2>
+      <div class="prose">${md(d.narrative || '')}</div>
+    </section>
+    <footer>
+      <div>출처: VocaDB(메타데이터) · 니코니코동화(조회 지표). 오디오는 수집하지 않습니다.</div>
+      <div>이 페이지는 히트를 예측하지 않습니다 — 측정 가능한 선행지표(조회 velocity·태그 점유율 변화·파생작 생성 속도)만 표시합니다.</div>
+    </footer>`;
+}
+
+fetch('data/latest.json', {cache: 'no-store'})
+  .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+  .then(render)
+  .catch(e => {
+    document.getElementById('week').textContent = '';
+    document.getElementById('body').innerHTML =
+      empty('주간 리포트를 불러오지 못했습니다', `data/latest.json — ${e.message}. 주간 배치가 아직 한 번도 발행하지 않았을 수 있습니다.`);
+  });
+</script>
 </body>
 </html>
