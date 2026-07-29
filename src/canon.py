@@ -98,10 +98,16 @@ Post = Callable[[dict], "tuple[int, dict | None]"]
 def _httpx_post(base_url: str, api_key: str) -> Post:
     import httpx  # lazy: keeps fixture tests stdlib-only
 
+    # 180s, not 60s: tier-1 is a thinking model since 2026-07-29 (plan 0003 E2).
+    # Measured on the box against a real 20-tag batch — gw-gemma 43.9s / 1961 tok
+    # (897 of them reasoning) vs the old gw-lite 3.3s / 998 tok. 60s left only 27%
+    # headroom, and the margin SHRINKS as the canon vocabulary grows and lengthens
+    # the prompt. A timeout here is not a slow item, it is the whole batch failing
+    # G1 and 20 tags going unclassified, so the headroom is deliberately generous.
     client = httpx.Client(
         base_url=base_url,
         headers={"Authorization": f"Bearer {api_key}"},
-        timeout=60.0,
+        timeout=180.0,
     )
 
     def post(body: dict) -> "tuple[int, dict | None]":

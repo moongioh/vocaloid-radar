@@ -21,6 +21,7 @@ import psycopg
 from src.config import DATABASE_URL
 from src.finops import rollup_db
 from src.report import load_evidence, persist_report
+from src.routing import FLASH, LITE
 
 WEEK = date(2026, 7, 13)       # a Monday
 PREV = date(2026, 7, 6)
@@ -105,8 +106,11 @@ def test_report_roundtrip(conn):
 
 def test_rollup_db_reflects_seeded_status(conn):
     r = rollup_db(conn)
-    # our four seeded tags: 2 canon_lite, 1 canon_flash, 1 pending
-    assert r["tiers"]["gw-lite"] >= 2
-    assert r["tiers"]["gw-flash"] >= 1
+    # our four seeded tags: 2 canon_lite, 1 canon_flash, 1 pending.
+    # Key off the LITE/FLASH constants, not literals: the tier-1 slot is a slot,
+    # and hardcoding its current occupant is what broke this test on the
+    # 2026-07-29 gw-lite -> gw-gemma swap.
+    assert r["tiers"][LITE] >= 2
+    assert r["tiers"][FLASH] >= 1
     assert r["pending_backlog"] >= 1
     assert 0.0 <= r["cache_hit_rate"] <= 1.0

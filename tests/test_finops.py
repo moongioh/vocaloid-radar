@@ -4,6 +4,7 @@ Exercises the pure aggregation of all three sources: status-count rollup,
 Phoenix span aggregation (incl. the paid-model guardrail), and the 승급쌍 일치율.
 """
 from src.finops import (
+    DAILY_QUOTA,
     agreement_rate,
     summarize_spans,
     summarize_status_counts,
@@ -38,7 +39,12 @@ def test_summarize_spans_per_tier():
         {"model": FLASH, "tokens": 500},
     ]
     r = summarize_spans(spans)
-    assert r["per_tier"][LITE] == {"calls": 2, "tokens": 250, "quota_pct": round(200 / 1000, 1)}
+    # Derive the denominator from DAILY_QUOTA — hardcoding it meant this test
+    # asserted the old gw-lite quota (1000) and failed on the 2026-07-29 swap to
+    # gw-gemma (1500), which is a config change, not a regression in the rollup.
+    assert r["per_tier"][LITE] == {
+        "calls": 2, "tokens": 250, "quota_pct": round(2 * 100 / DAILY_QUOTA[LITE], 1)
+    }
     assert r["per_tier"][FLASH]["calls"] == 1 and r["per_tier"][FLASH]["tokens"] == 500
     assert r["off_tier_calls"] == {}
 

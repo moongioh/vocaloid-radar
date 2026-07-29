@@ -24,7 +24,10 @@ from typing import Callable
 from .routing import FLASH, LITE, Status, TagResult
 
 # Free-tier daily request quotas (plan 0001 / memory gemini-free-tier-*).
-DAILY_QUOTA = {LITE: 1000, FLASH: 250}
+# LITE = 1500 since the 2026-07-29 tier-1 swap to gw-gemma (plan 0003 E2); the old
+# gw-lite figure was 1000. quota_pct is reported to the user, so a stale denominator
+# here understates headroom rather than failing loudly.
+DAILY_QUOTA = {LITE: 1500, FLASH: 250}
 
 
 # ------------------------------------------------------------------ DB rollup

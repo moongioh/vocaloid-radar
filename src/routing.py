@@ -23,7 +23,13 @@ from enum import Enum
 from typing import Callable
 
 # Logical model names as configured in the gateway's config.yaml (plan 0001).
-LITE = "gw-lite"
+# LITE is the tier-1 slot, not a claim about which model fills it: it moved from
+# gw-lite to gw-gemma on 2026-07-29 (plan 0003 E2). gw-lite was mis-classifying
+# with high self-reported confidence, which is exactly the failure the confidence
+# threshold below cannot catch — see the G4 note in RoutingConfig.
+# The Status values stay ``canon_lite``/``canon_flash``: they are persisted in
+# tags.canon_status, so renaming them would be a data migration for no gain.
+LITE = "gw-gemma"
 FLASH = "gw-flash"
 
 
