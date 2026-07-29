@@ -75,7 +75,16 @@ class RoutingConfig:
     # Max items escalated to flash per run. With batched flash calls the item
     # count is the meaningful load knob that protects report_gen's shared flash
     # quota; anything beyond it defers to `pending` rather than being demoted.
-    escalation_cap: int = 20
+    #
+    # 20 -> 100 on 2026-07-29 (plan 0004). 20 was set before we had a corpus to
+    # size it against, and it turned out to be a convergence stopper: escalations
+    # are how NEW canon terms enter the vocabulary, so a 20-item run budget caps
+    # vocabulary growth at 20 terms/run. Against ~900 unclassified tags that is
+    # ~45 weekly runs. The quota it protects is unaffected at 100 — escalated
+    # items go out BATCHED (one flash call per batch, not per item), so 100 items
+    # is ~5 flash calls in a run that happens once a week, against
+    # finops.DAILY_QUOTA[FLASH] = 250 per day.
+    escalation_cap: int = 100
 
 
 class _Gate(Enum):

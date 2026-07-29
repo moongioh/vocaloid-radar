@@ -35,6 +35,83 @@ _ATTEMPTS = 3
 _BACKOFF_BASE = 2.0  # seconds; doubles per retry
 
 
+# --------------------------------------------------------------- seed vocabulary
+#
+# The closed loop (plan 0002 §4) grows the vocabulary from what the model itself
+# proposes. That works once it is running; it has no answer for the FIRST run.
+# With an empty allowlist no item can pass G3, so batch 1 escalated all 20 tags,
+# minted the entire founding vocabulary in one shot, and exhausted the run-level
+# escalation cap — measured 2026-07-29: 458 of 500 tags deferred without a single
+# flash call, and the 20 founding terms covered 111 of 4,304 tag assignments
+# (2.6%), which is how `Bicycle Theme` and `Blender Software` became canon
+# families while `rock` and `duet` sat in pending. Everything downstream then had
+# to squeeze into that slice — `YYB Kagamine Len` (an MMD model author) landed on
+# `Beta Voicebank` at confidence 0.9 because no MMD-model family existed to pick.
+#
+# So the seed is a FLOOR, not a ceiling. It is authored, not generated: the axes
+# below come from reading the 195 tags with >=5 uses. Two rules held while
+# writing it, both learned from the failure above:
+#   1. AXES, NOT INSTANCES. `Bicycle Theme` is an instance; `Nature Theme` is an
+#      axis. The eight colour tags (red/blue/pink/...) collapse to `Color Theme`.
+#   2. A family only earns a slot if the corpus actually uses it. Nothing here
+#      was invented for symmetry.
+# It ended up at 97 terms rather than the 40-80 the plan estimated: the tag space
+# has 19 real axes, and trimming to a number picked before seeing the data would
+# have meant dropping axes that carry usage. Prompt cost is ~2 KB, and a WIDER
+# allowlist means FEWER is_new proposals, so it also cuts escalation.
+#
+# Changing this set changes how every future tag is classified. It is deliberately
+# in code, not in the DB, so a vocabulary change is a reviewable diff (plan 0004).
+SEED_VOCAB: "frozenset[str]" = frozenset({
+    # 장르
+    "Rock", "Alternative Rock", "Metal", "Pop", "J-Pop", "K-Pop", "Electronic",
+    "EDM", "House", "Trap Music", "Drum and Bass", "Breakcore", "Hyperpop",
+    "Chiptune", "Jazz", "Hip Hop", "Ballad", "Ambient Music",
+    # 무드
+    "Cute", "Dark Mood", "Sad Mood", "Calm Mood", "Funny", "Creepy", "Cool",
+    # 테마
+    "Love Theme", "Death Theme", "Blood Theme", "Supernatural Theme",
+    "Religion Theme", "Animal Theme", "Nature Theme", "Seasonal Theme",
+    # PV·영상 제작형태
+    "2D Animation", "3D Animation", "Editor PV", "Official Art PV",
+    "Live Action PV", "Music Visualization", "Pixel Art", "Kinetic Typography",
+    "AI-Generated Art",
+    # 색 — 개별 색 태그 8종이 여기로 접힌다
+    "Color Theme",
+    # 가창·합성 기술
+    "Cross-Lingual Synthesis", "Human Vocals", "Robotic Vocals", "Harsh Vocals",
+    "Speech Vocals", "Vocal Range", "Rapping", "Choir Vocals", "A Cappella",
+    "Tuning Quality", "Voice Genderswap",
+    # 보이스뱅크 상태
+    "Beta Voicebank", "Unofficial Voicebank", "Imported Voicebank",
+    "Voicebank Release", "Voicebank Demo", "Derived Voicebank",
+    "Unconfirmed Vocalist",
+    # 파생·커버 관계
+    "Derivative Work", "Cover", "Self-Cover", "Fan Work", "Parody", "Remix",
+    "Changed Lyrics", "Changed Language", "Version Variant", "Debut Work",
+    # 편성
+    "Duet", "Group Ensemble",
+    # 언어·자막
+    "Subtitled", "Multilingual", "Unsupported Language", "Instrumental",
+    # 데이터 배포
+    "Source Data Available", "Karaoke Available",
+    # 악기·기법
+    "Piano", "Electric Guitar", "Acoustic Guitar", "Sampling",
+    # 제작 소프트웨어
+    "Production Software",
+    # 콘텐츠 경고
+    "Flashing Lights Warning", "Explicit Content", "Content Warning",
+    # 원작·프랜차이즈
+    "Anime Original Song", "Video Game Theme", "Franchise Reference",
+    # 캐릭터·모델
+    "Vocalist Character", "MMD Model",
+    # 시대·스타일
+    "Retro Style", "80s Style", "Japanese Traditional Style",
+    # 메타
+    "Experimental", "Meme",
+})
+
+
 class GatewayUnavailable(Exception):
     """The gateway kept answering 429/5xx. Availability, not quality: the run
     defers remaining work to the next run instead of escalating tiers."""
@@ -215,23 +292,44 @@ def normalize_classify(
 # ----------------------------------------------------------------- db (thin)
 
 def load_work(conn, limit: int = 500) -> "list[TagInput]":
-    """Cache-miss tags only: pending (never attempted / deferred) + demoted retries."""
+    """Cache-miss tags (pending + demoted retries), **most-used first**.
+
+    The ordering is load-bearing, not cosmetic. Because the vocabulary is a
+    closed loop, whichever tags are processed FIRST decide the canon families
+    every later tag must fit into. The original ``ORDER BY id`` was VocaDB tag
+    creation order — effectively alphabetical, and uncorrelated with importance:
+    the first 20 rows covered 111 of 4,304 tag assignments (2.6%), while the 20
+    most-used tags cover 1,124 (26.1%). Same 20 slots, 10x the corpus.
+
+    LEFT JOIN, not INNER: a tag nobody has used must sort LAST, never drop out of
+    the work queue entirely. The ``t.id`` tie-break keeps runs reproducible.
+    """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, name FROM tags WHERE canon_status IN ('pending', 'demoted') "
-            "ORDER BY id LIMIT %s",
+            "SELECT t.id, t.name "
+            "FROM tags t LEFT JOIN song_tags st ON st.tag_id = t.id "
+            "WHERE t.canon_status IN ('pending', 'demoted') "
+            "GROUP BY t.id, t.name "
+            "ORDER BY count(st.tag_id) DESC, t.id "
+            "LIMIT %s",
             (limit,),
         )
         return [TagInput(id=r[0], name=r[1]) for r in cur.fetchall()]
 
 
 def load_vocab(conn) -> "set[str]":
+    """The G3 allowlist: the authored seed UNION everything earlier runs confirmed.
+
+    Union, not replace — the seed removes the cold start, it does not close the
+    loop. Flash-confirmed ``is_new`` proposals still grow the vocabulary exactly
+    as plan 0002 §4 specifies.
+    """
     with conn.cursor() as cur:
         cur.execute(
             "SELECT DISTINCT canon_name FROM tags "
             "WHERE canon_status IN ('canon_lite', 'canon_flash') AND canon_name IS NOT NULL"
         )
-        return {r[0] for r in cur.fetchall()}
+        return set(SEED_VOCAB) | {r[0] for r in cur.fetchall()}
 
 
 def persist(conn, results: "list[TagResult]") -> None:
